@@ -9,10 +9,13 @@
 #define WINPOS_X 100
 #define WINPOS_Y 100
 
-int winsze_x = 1024;
-int winsze_y = 768;
+struct Window {
+    int id = -1;
+    int w = 1024;
+    int h = 768;
+};
 
-int winid = 0;
+struct Window win;
 
 void display() {
     // white background
@@ -25,7 +28,7 @@ void display() {
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
         case 27:        // ESC
-            if (winid) glutDestroyWindow(winid);
+            if (win.id) glutDestroyWindow(win.id);
             exit(0);
             break;
     }
@@ -48,18 +51,18 @@ void reshape(GLsizei width, GLsizei height) {
         gluOrtho2D(-1.0, 1.0, -1.0 / aspect, 1.0 / aspect);
     }
 
-    winsze_x = width;
-    winsze_y = height;
+    win.w = width;
+    win.h = height;
 }
 
 int main(int argc, char **argv) {
     // initialize glut
     glutInit(&argc, argv);
     glutInitWindowPosition(WINPOS_X, WINPOS_Y);
-    glutInitWindowSize(winsze_x, winsze_y);
+    glutInitWindowSize(win.w, win.h);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
 
-    winid = glutCreateWindow("15-664 P1: IK Solver (dallen1)");
+    win.id = glutCreateWindow("15-664 P1: IK Solver (dallen1)");
 
     // glut callbacks
     glutDisplayFunc(display);

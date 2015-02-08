@@ -1,5 +1,6 @@
 # Linux (default)
 EXE = p1
+CPPFLAGS = -std=c++11
 LDFLAGS = -lGL -lGLU -lglut
 
 # Windows (cygwin)
@@ -13,5 +14,5 @@ ifeq "$(OSTYPE)" "darwin"
 	LDFLAGS = -framework Carbon -framework OpenGL -framework GLUT
 endif
 
-$(EXE) : main.c
-	gcc -o $@ $< $(CFLAGS) $(LDFLAGS)
+$(EXE) : main.cpp
+	g++ -o $@ $< $(CPPFLAGS) $(LDFLAGS)
