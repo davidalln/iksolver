@@ -14,5 +14,5 @@ ifeq "$(OSTYPE)" "darwin"
 	LDFLAGS = -framework Carbon -framework OpenGL -framework GLUT
 endif
 
-$(EXE) : main.cpp
+$(EXE) : main.cpp ikskel.h
 	g++ -o $@ $< $(CPPFLAGS) $(LDFLAGS)
