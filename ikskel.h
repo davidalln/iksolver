@@ -6,13 +6,15 @@
  *
  */
 
+#include <list>
+
 struct Joint {
     bool active = false;
-    GLfloat x, y;
-    GLfloat r;
+    GLfloat start_x, start_y;
+    GLfloat angle, length;
 
-    Joint(GLfloat xp, GLfloat yp, GLfloat rp) :
-        x(xp), y(yp), r(rp) { };
+    Joint (GLfloat x, GLfloat y, GLfloat a, GLfloat l) :
+        start_x(x), start_y(y), angle(a), length(l) { };
 };
 
 struct EndTarget {
@@ -21,7 +23,13 @@ struct EndTarget {
 };
 
 struct Skeleton {
+    bool frozen = false;
     std::list<Joint> joints;
     EndTarget end;
+
+    GLfloat root_x, root_y;
+
+    void freezeSkeleton();
+    void resetSkeleton();
 };
 

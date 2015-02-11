@@ -41,9 +41,20 @@ Skeleton skeleton;
 // the target we are trying to reach
 EndTarget target;
 
-__inline__ GLfloat toWorldSpace(int x, int w) {
-    int wx = 2 * x - w;
-    return (GLfloat)wx / (GLfloat) w;
+__inline__ std::pair<GLfloat, GLfloat> toWorldSpace(int x, int y) {
+    int wx = 2 * x - win.w;
+    int wy = 2 * y - win.h;
+
+    GLfloat wr = (GLfloat)wx / (GLfloat)win.w;
+    GLfloat hr = (GLfloat)wy / (GLfloat)win.h;
+
+    GLfloat aspect = (GLfloat)win.w / (GLfloat)win.h;
+    if (win.w > win.h)
+        wr *= aspect;
+    else
+        hr *= aspect;
+
+    return std::make_pair(wr, hr);
 }
 
 void display() {
@@ -54,87 +65,77 @@ void display() {
     glClearColor(1.f, 1.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // draw the joints and bones
+    glMatrixMode(GL_MODELVIEW);
+
+    // begin drawing the kinematic chain
+    glPushMatrix();
+    glLoadIdentity();
+
+    GLfloat skelroot_x = skeleton.root_x;
+    GLfloat skelroot_y = skeleton.root_y;
+
+    glTranslatef(skelroot_x, skelroot_y, 0.f);
+
+    GLfloat lastJointLen = 0.f;
+
     std::list<Joint>::const_iterator joints;
     for (joints = skeleton.joints.begin(); joints != skeleton.joints.end(); ++joints) {
-        Joint joint_start = *joints;
+        Joint joint = *joints;
 
-        // peek at the next joint then reset the pointer
-        std::list<Joint>::const_iterator nextJoint = ++joints;
-        --joints;
+        // translate this and all further joints by its angle
+        GLfloat jlength = joint.length;
+        glTranslatef(lastJointLen, 0.f, 0.f);
+        glRotatef(joint.angle, 0.f, 0.f, 1.f);
 
-        EndTarget js_coords, je_coords;
-        js_coords.x = joint_start.x;
-        js_coords.y = joint_start.y;
-
-        if (nextJoint == skeleton.joints.end()) {
-            je_coords.x = skeleton.end.x;
-            je_coords.y = skeleton.end.y;
-        } else {
-            je_coords.x = (*nextJoint).x;
-            je_coords.y = (*nextJoint).y;
-        }
-
-        GLfloat aspect = (GLfloat)win.w / (GLfloat)win.h;
-        if (win.w > win.h) {
-            js_coords.x *= aspect;
-            je_coords.x *= aspect;
-        } else {
-            js_coords.y *= aspect;
-            je_coords.y *= aspect;
-        }
-
-        // bone
-        // TODO: different color if bone is inactive (i.e. dragged out)
-        glColor3f(1.0, 0.0, 0.0);
+        // draw the bone
+        glColor3f(1.f, 0.f, 0.f);
         glBegin(GL_LINES);
-            glVertex2f(js_coords.x, js_coords.y);
-            glVertex2f(je_coords.x, je_coords.y);
+            glVertex2f(0.f, 0.f);
+            glVertex2f(jlength, 0.f);
         glEnd();
 
-        // joint
-        // TODO: don't draw if inactive
+        // draw the joint
         glColor3f(1.0, 1.0, 0.0);
         glBegin(GL_TRIANGLE_FAN);
         for (int i = 0; i <= 20; i++) {
-            glVertex2f(js_coords.x + (JOINT_RAD * cos(i * (2 * M_PI) / 20)),
-                    js_coords.y + (JOINT_RAD * sin(i * (2 * M_PI) / 20)));
+            glVertex2f((JOINT_RAD * cos(i * (2 * M_PI) / 20)),
+                    (JOINT_RAD * sin(i * (2 * M_PI) / 20)));
         }
         glEnd();
+
+        lastJointLen = jlength;
     }
 
-    // end effector
+    // draw the end effector
     if (skeleton.end.active) {
-        GLfloat endx = skeleton.end.x;
-        GLfloat endy = skeleton.end.y;
+        glColor3f(0.f, 0.f, 1.f);
+        glTranslatef(lastJointLen, 0.f, 0.f);
 
-        GLfloat aspect = (GLfloat)win.w / (GLfloat)win.h;
-        if (win.w > win.h) {
-            endx *= aspect;
+        // square if the skeleton isn't done, circle if it is
+        if (!skeleton.frozen) {
+            glBegin(GL_QUADS);
+                glVertex2f(-END_SZE_X, -END_SZE_Y);
+                glVertex2f(END_SZE_X, -END_SZE_Y);
+                glVertex2f(END_SZE_X, END_SZE_Y);
+                glVertex2f(-END_SZE_X, END_SZE_Y);
+            glEnd();
         } else {
-            endy *= aspect;
+            glBegin(GL_TRIANGLE_FAN);
+            for (int i = 0; i <= 20; i++) {
+                glVertex2f((JOINT_RAD * cos(i * (2 * M_PI) / 20)),
+                    (JOINT_RAD * sin(i * (2 * M_PI) / 20)));
+            }
+            glEnd();
         }
-
-        glBegin(GL_QUADS);
-            glColor3f(0.f, 0.f, 1.f);
-            glVertex2f(endx - END_SZE_X, endy - END_SZE_Y);
-            glVertex2f(endx + END_SZE_X, endy - END_SZE_Y);
-            glVertex2f(endx + END_SZE_X, endy + END_SZE_Y);
-            glVertex2f(endx - END_SZE_X, endy + END_SZE_Y);
-        glEnd();
     }
+
+    glPopMatrix();
+    // end drawing the kinematic chain
 
     // target
     if (target.active) {
         GLfloat tarx = target.x;
         GLfloat tary = target.y;
-
-        GLfloat aspect = (GLfloat)win.w / (GLfloat)win.h;
-        if (win.w > win.h) {
-            tarx *= aspect;
-        } else {
-            tary *= aspect;
-        }
 
         GLfloat ax, ay, bx, by, cx, cy;
         GLfloat pi23 = 2.f * M_PI / 3.f;
@@ -162,28 +163,17 @@ void display() {
 
 void mouse(int button, int state, int x, int y) {
     switch (button) {
-        // update our target
         case GLUT_LEFT_BUTTON:
-            if (state == GLUT_UP) {
-                GLfloat newTarX = toWorldSpace(x, win.w);
-                GLfloat newTarY = toWorldSpace(win.h - y - 1, win.h);
-
-                if (!skeleton.joints.empty()) {
-                    target.active = true;
-                    target.x = newTarX;
-                    target.y = newTarY;
-                }
-            }
-            break;
-
-        // update the end position of the skeleton and add a joint
-        case GLUT_RIGHT_BUTTON:
-            if (state == GLUT_UP) {
-                GLfloat newEndX = toWorldSpace(x, win.w);
-                GLfloat newEndY = toWorldSpace(win.h - y - 1, win.h);
+            // update the end position of the skeleton and add a joint
+            if (state == GLUT_UP && !skeleton.frozen) {
+                std::pair<GLfloat, GLfloat> nars = toWorldSpace(x, win.h - y - 1);
+                GLfloat newEndX = nars.first;
+                GLfloat newEndY = nars.second;
 
                 if (!skeleton.end.active) {
                     skeleton.end.active = true;
+                    skeleton.root_x = newEndX;
+                    skeleton.root_y = newEndY;
                 } else {
                     // create a new joint
                     GLfloat oldEndX = skeleton.end.x;
@@ -198,28 +188,39 @@ void mouse(int button, int state, int x, int y) {
                         u2 = 0;
                     } else {
                         Joint endJoint = skeleton.joints.back();
-                        u1 = oldEndX - endJoint.x;
-                        u2 = oldEndY - endJoint.y;
+                        u1 = oldEndX - endJoint.start_x;
+                        u2 = oldEndY - endJoint.start_y;
                     }
 
                     GLfloat v1 = newEndX - oldEndX;
                     GLfloat v2 = newEndY - oldEndY;
 
-                    double num = u1 * v1 + u2 * v2;
-                    double dem = sqrtf(u1 * u1 + u2 * u2) * sqrtf(v1 * v1 + v2 * v2);
+                    GLfloat atanA = atan2(u2, u1);
+                    GLfloat atanB = atan2(v2, v1);
 
-                    GLfloat angle = acos(num/dem) * 180 / M_PI;
-                    angle = (newEndY > oldEndY) ? angle : -angle;
+                    GLfloat angle = (atanB - atanA) * 180 / M_PI;
 
-                    skeleton.joints.push_back(Joint(oldEndX, oldEndY, angle));
+                    GLfloat length = sqrtf(v1 * v1 + v2 * v2);
+
+                    skeleton.joints.push_back(Joint(oldEndX, oldEndY, angle, length));
                     std::cout << "joint placed at " << oldEndX << "," << oldEndY <<
-                        " w/ angle " << angle << " (u1: " << u1 << ", v1: " << v1 << ", u2: " << u2 << ", v2: " << v2 << ", num: " << num << ", dem: " << dem << ")" << std::endl;
+                        " w/ angle " << angle << " and length " << length << std::endl;
                 }
 
                 skeleton.end.x = newEndX;
                 skeleton.end.y = newEndY;
 
                 std::cout << "--" << std::endl;
+
+            // update our target
+            } else if (state == GLUT_UP && skeleton.frozen) {
+                std::pair<GLfloat, GLfloat> tars = toWorldSpace(x, win.h - y - 1);
+
+                if (!skeleton.joints.empty()) {
+                    target.active = true;
+                    target.x = tars.first;
+                    target.y = tars.second;
+                }
             }
             break;
     }
@@ -233,6 +234,12 @@ void keyboard(unsigned char key, int x, int y) {
             if (win.id) glutDestroyWindow(win.id);
             exit(0);
             break;
+
+        case 32:        // SPACE
+            if (skeleton.frozen)
+                skeleton.resetSkeleton();
+            else
+                skeleton.freezeSkeleton();
     }
 
     glutPostRedisplay();
