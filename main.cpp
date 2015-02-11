@@ -28,7 +28,10 @@
 #define TARGET_RAD 0.025
 
 // number of times we run CCD before termination
-#define NUM_CCD_ITERS 1000
+#define NUM_CCD_ITERS 100
+
+// how close we need to get to terminate CCD
+#define CCD_EPSILON 0.01
 
 struct Window {
     int id = -1;
@@ -43,6 +46,8 @@ Skeleton skeleton;
 
 // the target we are trying to reach
 EndTarget target;
+
+bool updateIK = false;
 
 __inline__ std::pair<GLfloat, GLfloat> toWorldSpace(int x, int y) {
     int wx = 2 * x - win.w;
@@ -164,6 +169,28 @@ void display() {
     glutSwapBuffers();
 }
 
+void motion(int x, int y) {
+    if (updateIK) {
+        std::pair<GLfloat, GLfloat> tars = toWorldSpace(x, win.h - y - 1);
+
+        if (!skeleton.joints.empty()) {
+            target.active = true;
+            target.x = tars.first;
+            target.y = tars.second;
+
+            for (int i = 0; i < NUM_CCD_ITERS; i++) {
+                skeleton.solveIKwithCCD(target);
+                GLfloat dx = target.x - skeleton.end.x;
+                GLfloat dy = target.y - skeleton.end.y;
+                if (sqrtf(dx * dx + dy * dy) < CCD_EPSILON)
+                    break;
+            }
+        }
+    }
+
+    glutPostRedisplay();
+}
+
 void mouse(int button, int state, int x, int y) {
     switch (button) {
         case GLUT_LEFT_BUTTON:
@@ -216,17 +243,12 @@ void mouse(int button, int state, int x, int y) {
                 std::cout << "--" << std::endl;
 
             // update our target
+            } else if (state == GLUT_DOWN && skeleton.frozen) {
+                updateIK = true;
+                motion(x, y);
             } else if (state == GLUT_UP && skeleton.frozen) {
-                std::pair<GLfloat, GLfloat> tars = toWorldSpace(x, win.h - y - 1);
-
-                if (!skeleton.joints.empty()) {
-                    target.active = true;
-                    target.x = tars.first;
-                    target.y = tars.second;
-
-                    for (int i = 0; i < NUM_CCD_ITERS; i++)
-                        skeleton.solveIKwithCCD(target);
-                }
+                updateIK = false;
+                motion(x, y);
             }
             break;
     }
@@ -286,6 +308,7 @@ int main(int argc, char **argv) {
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
     glutMouseFunc(mouse);
+    glutMotionFunc(motion);
 
     // start the application
     glutMainLoop();

@@ -48,11 +48,12 @@ void Skeleton::solveIKwithCCD(EndTarget target) {
         end.x += joint->x;
         end.y += joint->y;
 
-        // rotate the rest of the joints
         GLfloat lastJointX = joint->x;
         GLfloat lastJointY = joint->y;
         GLfloat rootX = 0.f;
         GLfloat rootY = 0.f;
+
+        // rotate the rest of the joints
         std::list<Joint>::iterator ujoint;
         for (ujoint = joint.base(); ujoint != joints.end(); ++ujoint) {
             GLfloat ljx = lastJointX;
@@ -61,37 +62,19 @@ void Skeleton::solveIKwithCCD(EndTarget target) {
             lastJointX = ujoint->x;
             lastJointY = ujoint->y;
 
+            // place the joint centered at the origin translated
+            // away from the rest of the joints
             rootX = ujoint->x - ljx + rootX;
             rootY = ujoint->y - ljy + rootY;
 
+            // rotate the joint
             ujoint->x = rootX * cos(ap) - rootY * sin(ap);
             ujoint->y = rootY * cos(ap) + rootX * sin(ap);
 
+            // put it back in the correct space
             ujoint->x += joint->x;
             ujoint->y += joint->y;
         }
-        /*
-        GLfloat lastJointX = joint->x;
-        GLfloat lastJointY = joint->y;
-        std::list<Joint>::iterator ujoint;
-        for (ujoint = joint.base(); ujoint != joints.end(); ++ujoint) {
-            GLfloat ljx = lastJointX;
-            GLfloat ljy = lastJointY;
-
-            lastJointX = ujoint->x;
-            lastJointY = ujoint->y; 
-
-            // rotate the joint
-            GLfloat vx = ujoint->x - ljx;
-            GLfloat vy = ujoint->y - ljy;
-            ujoint->x = vx * cos(ap) - vy * sin(ap);
-            ujoint->y = vy * cos(ap) + vx * sin(ap);
-
-            // put it back into place
-            ujoint->x += ljx;
-            ujoint->y += ljy;
-        }
-        */
     }
 }
 
