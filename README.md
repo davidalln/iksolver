@@ -7,13 +7,14 @@ An inverse kinematics solver. There are two modes in the program: drawing the sk
 
 Controls
 --------
+#### General
 * ESC to quit program
 
-### Drawing Mode
+#### Drawing Mode
 * RMB to draw joints (first click to set the root, then click again to build joints)
 * SPACE to switch to IK mode (end effector switches from square to circle)
 
-### IK Mode
+#### IK Mode
 * RMB to move IK target
 * SPACE to switch to drawing mode (deletes the current skeleton)
 
