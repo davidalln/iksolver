@@ -26,4 +26,6 @@ Code Layout
 Implemented IK Solvers
 ----------------------
 * CCD
+* Jacobian Transpose
+* Jacobian Psuedoinverse
 

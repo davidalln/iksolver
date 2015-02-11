@@ -1,9 +1,9 @@
 # Linux (default)
 EXE = p1
-CPPFLAGS = -std=c++11
+CPPFLAGS = -std=c++11 -w
 LDFLAGS = -lGL -lGLU -lglut
 
-CPPFILES = main.cpp ikskel.cpp
+CPPFILES = main.cpp ikskel.cpp asst2/matrix.cpp asst2/nrutil.cpp asst2/pythag.cpp asst2/svdcmp.cpp
 CPPHEADERS = ikskel.h
 
 # Windows (cygwin)

@@ -6,6 +6,9 @@
  *
  */
 
+#ifndef _IKSKEL_H_
+#define _IKSKEL_H_
+
 #include <list>
 
 __inline__ GLfloat clamp(GLfloat x) {
@@ -28,6 +31,8 @@ struct EndTarget {
     GLfloat x, y;
 };
 
+enum JacobianMethod { TRANSPOSE, PSEUDOINVERSE };
+
 struct Skeleton {
     bool frozen = false;
     std::list<Joint> joints;
@@ -39,5 +44,7 @@ struct Skeleton {
     void resetSkeleton();
 
     void solveIKwithCCD(EndTarget target);
+    void solveIKwithJacobian(EndTarget target, JacobianMethod method);
 };
 
+#endif

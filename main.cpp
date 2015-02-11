@@ -29,9 +29,11 @@
 
 // number of times we run CCD before termination
 #define NUM_CCD_ITERS 100
+#define NUM_JAC_ITERS 1000
 
 // how close we need to get to terminate CCD
 #define CCD_EPSILON 0.01
+#define JAC_EPSILON 0.0001
 
 struct Window {
     int id = -1;
@@ -119,7 +121,7 @@ void display() {
         glColor3f(0.f, 0.f, 1.f);
         glTranslatef(lastJointLen, 0.f, 0.f);
 
-        // square if the skeleton isn't done, circle if it is
+        // square if in drawing mode, circle otherwise
         if (!skeleton.frozen) {
             glBegin(GL_QUADS);
                 glVertex2f(-END_SZE_X, -END_SZE_Y);
@@ -140,7 +142,7 @@ void display() {
     glPopMatrix();
     // end drawing the kinematic chain
 
-    // target
+    // draw the target if one exists
     if (target.active) {
         GLfloat tarx = target.x;
         GLfloat tary = target.y;
@@ -178,6 +180,20 @@ void motion(int x, int y) {
             target.x = tars.first;
             target.y = tars.second;
 
+            for (int i = 0; i < NUM_JAC_ITERS; i++) {
+                GLfloat ox = skeleton.end.x;
+                GLfloat oy = skeleton.end.y;
+
+                JacobianMethod method = PSEUDOINVERSE;
+                skeleton.solveIKwithJacobian(target, method);
+
+                GLfloat dx = skeleton.end.x - ox;
+                GLfloat dy = skeleton.end.y - oy;
+                if (sqrtf(dx * dx + dy * dy) < JAC_EPSILON)
+                    break;
+            }
+
+            /*
             for (int i = 0; i < NUM_CCD_ITERS; i++) {
                 skeleton.solveIKwithCCD(target);
                 GLfloat dx = target.x - skeleton.end.x;
@@ -185,6 +201,7 @@ void motion(int x, int y) {
                 if (sqrtf(dx * dx + dy * dy) < CCD_EPSILON)
                     break;
             }
+            */
         }
     }
 
@@ -277,6 +294,8 @@ void keyboard(unsigned char key, int x, int y) {
 
 // standard rescaling on window resize event
 void reshape(GLsizei width, GLsizei height) {
+    // TODO: resizing window during drawing mode breaks it
+
     if (height == 0) height = 1;
     GLfloat aspect = (GLfloat)width / (GLfloat)height;
 
@@ -314,3 +333,4 @@ int main(int argc, char **argv) {
     glutMainLoop();
     return 0;
 }
+
