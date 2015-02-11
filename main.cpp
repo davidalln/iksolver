@@ -27,6 +27,9 @@
 // radius of the target marker
 #define TARGET_RAD 0.025
 
+// number of times we run CCD before termination
+#define NUM_CCD_ITERS 1000
+
 struct Window {
     int id = -1;
     int w = 1024;
@@ -188,8 +191,8 @@ void mouse(int button, int state, int x, int y) {
                         u2 = 0;
                     } else {
                         Joint endJoint = skeleton.joints.back();
-                        u1 = oldEndX - endJoint.start_x;
-                        u2 = oldEndY - endJoint.start_y;
+                        u1 = oldEndX - endJoint.x;
+                        u2 = oldEndY - endJoint.y;
                     }
 
                     GLfloat v1 = newEndX - oldEndX;
@@ -198,7 +201,7 @@ void mouse(int button, int state, int x, int y) {
                     GLfloat atanA = atan2(u2, u1);
                     GLfloat atanB = atan2(v2, v1);
 
-                    GLfloat angle = (atanB - atanA) * 180 / M_PI;
+                    GLfloat angle = (atanB - atanA) * 180.f / M_PI;
 
                     GLfloat length = sqrtf(v1 * v1 + v2 * v2);
 
@@ -220,6 +223,9 @@ void mouse(int button, int state, int x, int y) {
                     target.active = true;
                     target.x = tars.first;
                     target.y = tars.second;
+
+                    for (int i = 0; i < NUM_CCD_ITERS; i++)
+                        skeleton.solveIKwithCCD(target);
                 }
             }
             break;
@@ -236,10 +242,12 @@ void keyboard(unsigned char key, int x, int y) {
             break;
 
         case 32:        // SPACE
-            if (skeleton.frozen)
+            if (skeleton.frozen) {
+                target.active = false;
                 skeleton.resetSkeleton();
-            else
+            } else {
                 skeleton.freezeSkeleton();
+            }
     }
 
     glutPostRedisplay();

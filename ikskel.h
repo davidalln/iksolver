@@ -8,13 +8,19 @@
 
 #include <list>
 
+__inline__ GLfloat clamp(GLfloat x) {
+    if (x < -180.f) x += 360.f;
+    if (x > 180.f) x -= 360.f;
+    return x;
+}
+
 struct Joint {
     bool active = false;
-    GLfloat start_x, start_y;
+    GLfloat x, y;
     GLfloat angle, length;
 
-    Joint (GLfloat x, GLfloat y, GLfloat a, GLfloat l) :
-        start_x(x), start_y(y), angle(a), length(l) { };
+    Joint (GLfloat xp, GLfloat yp, GLfloat a, GLfloat l) :
+        x(xp), y(yp), angle(a), length(l) { };
 };
 
 struct EndTarget {
@@ -31,5 +37,7 @@ struct Skeleton {
 
     void freezeSkeleton();
     void resetSkeleton();
+
+    void solveIKwithCCD(EndTarget target);
 };
 
