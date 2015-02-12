@@ -34,6 +34,7 @@ struct EndTarget {
 enum JacobianMethod { TRANSPOSE, PSEUDOINVERSE };
 
 struct Skeleton {
+    bool active = false;
     bool frozen = false;
     std::list<Joint> joints;
     EndTarget end;

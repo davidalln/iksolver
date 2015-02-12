@@ -17,6 +17,9 @@ Controls
 #### IK Mode
 * RMB to move IK target
 * SPACE to switch to drawing mode (deletes the current skeleton)
+* 1 to activate/deactivate CCD skeleton (colored red)
+* 2 to activate/deactivate Jacobian Transpose skeleton (colored cyan)
+* 3 to activate/deactivate Jacobian Pseudoinverse skeleton (colored purple)
 
 Code Layout
 -----------

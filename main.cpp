@@ -1,3 +1,4 @@
+#include <ctime>
 #include <iostream>
 #include <list>
 #include <math.h>
@@ -29,7 +30,7 @@
 
 // number of times we run CCD before termination
 #define NUM_CCD_ITERS 100
-#define NUM_JAC_ITERS 1000
+#define NUM_JAC_ITERS 100
 
 // how close we need to get to terminate CCD
 #define CCD_EPSILON 0.01
@@ -44,7 +45,9 @@ struct Window {
 Window win;
 
 // the skeleton holding joint pos/angle info
-Skeleton skeleton;
+Skeleton skeletonCCD;
+Skeleton skeletonIKT;
+Skeleton skeletonIKP;
 
 // the target we are trying to reach
 EndTarget target;
@@ -67,29 +70,20 @@ __inline__ std::pair<GLfloat, GLfloat> toWorldSpace(int x, int y) {
     return std::make_pair(wr, hr);
 }
 
-void display() {
-    // display params
-    glLineWidth(BONE_WIDTH);
-
-    // white background
-    glClearColor(1.f, 1.f, 1.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glMatrixMode(GL_MODELVIEW);
-
+void drawKinematicChain(Skeleton skel, GLfloat r, GLfloat g, GLfloat b) {
     // begin drawing the kinematic chain
     glPushMatrix();
     glLoadIdentity();
 
-    GLfloat skelroot_x = skeleton.root_x;
-    GLfloat skelroot_y = skeleton.root_y;
+    GLfloat skelroot_x = skel.root_x;
+    GLfloat skelroot_y = skel.root_y;
 
     glTranslatef(skelroot_x, skelroot_y, 0.f);
 
     GLfloat lastJointLen = 0.f;
 
     std::list<Joint>::const_iterator joints;
-    for (joints = skeleton.joints.begin(); joints != skeleton.joints.end(); ++joints) {
+    for (joints = skel.joints.begin(); joints != skel.joints.end(); ++joints) {
         Joint joint = *joints;
 
         // translate this and all further joints by its angle
@@ -98,7 +92,7 @@ void display() {
         glRotatef(joint.angle, 0.f, 0.f, 1.f);
 
         // draw the bone
-        glColor3f(1.f, 0.f, 0.f);
+        glColor3f(r, g, b);
         glBegin(GL_LINES);
             glVertex2f(0.f, 0.f);
             glVertex2f(jlength, 0.f);
@@ -117,12 +111,12 @@ void display() {
     }
 
     // draw the end effector
-    if (skeleton.end.active) {
+    if (skel.end.active) {
         glColor3f(0.f, 0.f, 1.f);
         glTranslatef(lastJointLen, 0.f, 0.f);
 
         // square if in drawing mode, circle otherwise
-        if (!skeleton.frozen) {
+        if (!skel.frozen) {
             glBegin(GL_QUADS);
                 glVertex2f(-END_SZE_X, -END_SZE_Y);
                 glVertex2f(END_SZE_X, -END_SZE_Y);
@@ -141,6 +135,21 @@ void display() {
 
     glPopMatrix();
     // end drawing the kinematic chain
+}
+
+void display() {
+    // display params
+    glLineWidth(BONE_WIDTH);
+
+    // white background
+    glClearColor(1.f, 1.f, 1.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glMatrixMode(GL_MODELVIEW);
+
+    if (skeletonCCD.active) drawKinematicChain(skeletonCCD, 1.f, 0.f, 0.f);
+    if (skeletonIKT.active) drawKinematicChain(skeletonIKT, 0.f, 1.f, 1.f);
+    if (skeletonIKP.active) drawKinematicChain(skeletonIKP, 1.f, 0.f, 1.f);
 
     // draw the target if one exists
     if (target.active) {
@@ -175,33 +184,68 @@ void motion(int x, int y) {
     if (updateIK) {
         std::pair<GLfloat, GLfloat> tars = toWorldSpace(x, win.h - y - 1);
 
-        if (!skeleton.joints.empty()) {
+        if (!skeletonCCD.joints.empty()) {
             target.active = true;
             target.x = tars.first;
             target.y = tars.second;
 
-            for (int i = 0; i < NUM_JAC_ITERS; i++) {
-                GLfloat ox = skeleton.end.x;
-                GLfloat oy = skeleton.end.y;
+            if (skeletonIKP.active) {
+                using namespace std;
+                clock_t begin = clock();
+                for (int i = 0; i < NUM_JAC_ITERS; i++) {
+                    GLfloat ox = skeletonIKP.end.x;
+                    GLfloat oy = skeletonIKP.end.y;
 
-                JacobianMethod method = PSEUDOINVERSE;
-                skeleton.solveIKwithJacobian(target, method);
+                    JacobianMethod method = PSEUDOINVERSE;
+                    skeletonIKP.solveIKwithJacobian(target, method);
 
-                GLfloat dx = skeleton.end.x - ox;
-                GLfloat dy = skeleton.end.y - oy;
-                if (sqrtf(dx * dx + dy * dy) < JAC_EPSILON)
-                    break;
+                    GLfloat dx = skeletonIKP.end.x - ox;
+                    GLfloat dy = skeletonIKP.end.y - oy;
+                    if (sqrtf(dx * dx + dy * dy) < JAC_EPSILON)
+                        break;
+                }
+                clock_t end = clock();
+                double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+
+                std::cout << "ik jacobian pseudoinverse took " << elapsed << " seconds" << std::endl;
             }
 
-            /*
-            for (int i = 0; i < NUM_CCD_ITERS; i++) {
-                skeleton.solveIKwithCCD(target);
-                GLfloat dx = target.x - skeleton.end.x;
-                GLfloat dy = target.y - skeleton.end.y;
-                if (sqrtf(dx * dx + dy * dy) < CCD_EPSILON)
-                    break;
+            if (skeletonIKT.active) {
+                using namespace std;
+                clock_t begin = clock();
+                for (int i = 0; i < NUM_JAC_ITERS; i++) {
+                    GLfloat ox = skeletonIKT.end.x;
+                    GLfloat oy = skeletonIKT.end.y;
+
+                    JacobianMethod method = TRANSPOSE;
+                    skeletonIKT.solveIKwithJacobian(target, method);
+
+                    GLfloat dx = skeletonIKT.end.x - ox;
+                    GLfloat dy = skeletonIKT.end.y - oy;
+                    if (sqrtf(dx * dx + dy * dy) < JAC_EPSILON)
+                        break;
+                }
+                clock_t end = clock();
+                double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+
+                std::cout << "ik jacobian transpose took " << elapsed << " seconds" << std::endl;
             }
-            */
+
+            if (skeletonCCD.active) {
+                using namespace std;
+                clock_t begin = clock();
+                for (int i = 0; i < NUM_CCD_ITERS; i++) {
+                    skeletonCCD.solveIKwithCCD(target);
+                    GLfloat dx = target.x - skeletonCCD.end.x;
+                    GLfloat dy = target.y - skeletonCCD.end.y;
+                    if (sqrtf(dx * dx + dy * dy) < CCD_EPSILON)
+                        break;
+                }
+                clock_t end = clock();
+                double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+
+                std::cout << "ik ccd took " << elapsed << " seconds" << std::endl;
+            }
         }
     }
 
@@ -212,29 +256,37 @@ void mouse(int button, int state, int x, int y) {
     switch (button) {
         case GLUT_LEFT_BUTTON:
             // update the end position of the skeleton and add a joint
-            if (state == GLUT_UP && !skeleton.frozen) {
+            if (state == GLUT_UP && !skeletonCCD.frozen) {
                 std::pair<GLfloat, GLfloat> nars = toWorldSpace(x, win.h - y - 1);
                 GLfloat newEndX = nars.first;
                 GLfloat newEndY = nars.second;
 
-                if (!skeleton.end.active) {
-                    skeleton.end.active = true;
-                    skeleton.root_x = newEndX;
-                    skeleton.root_y = newEndY;
+                if (!skeletonCCD.end.active) {
+                    skeletonCCD.end.active = true;
+                    skeletonCCD.root_x = newEndX;
+                    skeletonCCD.root_y = newEndY;
+
+                    skeletonIKT.end.active = true;
+                    skeletonIKT.root_x = newEndX;
+                    skeletonIKT.root_y = newEndY;
+
+                    skeletonIKP.end.active = true;
+                    skeletonIKP.root_x = newEndX;
+                    skeletonIKP.root_y = newEndY;
                 } else {
                     // create a new joint
-                    GLfloat oldEndX = skeleton.end.x;
-                    GLfloat oldEndY = skeleton.end.y;
+                    GLfloat oldEndX = skeletonCCD.end.x;
+                    GLfloat oldEndY = skeletonCCD.end.y;
 
                     if (newEndX == oldEndX && newEndY == oldEndY)
                         break;
 
                     GLfloat u1, u2;
-                    if (skeleton.joints.empty()) {
+                    if (skeletonCCD.joints.empty()) {
                         u1 = 1;
                         u2 = 0;
                     } else {
-                        Joint endJoint = skeleton.joints.back();
+                        Joint endJoint = skeletonCCD.joints.back();
                         u1 = oldEndX - endJoint.x;
                         u2 = oldEndY - endJoint.y;
                     }
@@ -249,21 +301,29 @@ void mouse(int button, int state, int x, int y) {
 
                     GLfloat length = sqrtf(v1 * v1 + v2 * v2);
 
-                    skeleton.joints.push_back(Joint(oldEndX, oldEndY, angle, length));
+                    skeletonCCD.joints.push_back(Joint(oldEndX, oldEndY, angle, length));
+                    skeletonIKT.joints.push_back(Joint(oldEndX, oldEndY, angle, length));
+                    skeletonIKP.joints.push_back(Joint(oldEndX, oldEndY, angle, length));
                     std::cout << "joint placed at " << oldEndX << "," << oldEndY <<
                         " w/ angle " << angle << " and length " << length << std::endl;
                 }
 
-                skeleton.end.x = newEndX;
-                skeleton.end.y = newEndY;
+                skeletonCCD.end.x = newEndX;
+                skeletonCCD.end.y = newEndY;
+
+                skeletonIKT.end.x = newEndX;
+                skeletonIKT.end.y = newEndY;
+
+                skeletonIKP.end.x = newEndX;
+                skeletonIKP.end.y = newEndY;
 
                 std::cout << "--" << std::endl;
 
             // update our target
-            } else if (state == GLUT_DOWN && skeleton.frozen) {
+            } else if (state == GLUT_DOWN && skeletonCCD.frozen) {
                 updateIK = true;
                 motion(x, y);
-            } else if (state == GLUT_UP && skeleton.frozen) {
+            } else if (state == GLUT_UP && skeletonCCD.frozen) {
                 updateIK = false;
                 motion(x, y);
             }
@@ -275,18 +335,45 @@ void mouse(int button, int state, int x, int y) {
 
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
+        case 49:
+            if (skeletonCCD.frozen) {
+                skeletonCCD.active = !skeletonCCD.active;
+            }
+            break;
+
+        case 50:
+            if (skeletonIKT.frozen) {
+                skeletonIKT.active = !skeletonIKT.active;
+            }
+            break;
+
+        case 51:
+            if (skeletonIKP.frozen) {
+                skeletonIKP.active = !skeletonIKP.active;
+            }
+            break;
+
         case 27:        // ESC
             if (win.id) glutDestroyWindow(win.id);
             exit(0);
             break;
 
         case 32:        // SPACE
-            if (skeleton.frozen) {
+            if (skeletonCCD.frozen) {
                 target.active = false;
-                skeleton.resetSkeleton();
+                skeletonCCD.resetSkeleton();
+                skeletonIKT.resetSkeleton();
+                skeletonIKP.resetSkeleton();
+
+                skeletonCCD.active = true;
+                skeletonIKT.active = false;
+                skeletonIKP.active = false;
             } else {
-                skeleton.freezeSkeleton();
+                skeletonCCD.freezeSkeleton();
+                skeletonIKT.freezeSkeleton();
+                skeletonIKP.freezeSkeleton();
             }
+            break;
     }
 
     glutPostRedisplay();
@@ -314,6 +401,8 @@ void reshape(GLsizei width, GLsizei height) {
 }
 
 int main(int argc, char **argv) {
+    skeletonCCD.active = true;
+
     // initialize glut
     glutInit(&argc, argv);
     glutInitWindowPosition(WINPOS_X, WINPOS_Y);
